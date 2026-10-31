@@ -1,0 +1,160 @@
+# RadaWatch — unified monitoring pipeline configuration
+
+cities:
+  odesa:
+    name: "Одеська міська рада"
+    telegram_chat_id: "${TELEGRAM_CHAT_ODESA}"
+    rss_url: ~
+    commissions_url: "https://deputat.omr.gov.ua/commissions/schedule/"
+    decisions_council_url: "https://deputat.omr.gov.ua/decisions/"
+    decisions_exec_url: ~
+    youtube_channel_id: ~
+    parser: "odesa"
+    risk_threshold_uah: 10000000
+
+  mykolaiv:
+    name: "Миколаївська міська рада"
+    telegram_chat_id: "${TELEGRAM_CHAT_MYKOLAIV}"
+    rss_url: ~
+    commissions_url: "https://mkrada.gov.ua/commissions/"
+    decisions_council_url: "https://mkrada.gov.ua/decisions/"
+    decisions_exec_url: ~
+    youtube_channel_id: ~
+    parser: "generic"
+    risk_threshold_uah: 10000000
+
+  kherson:
+    name: "Херсонська міська рада"
+    telegram_chat_id: "${TELEGRAM_CHAT_KHERSON}"
+    rss_url: ~
+    commissions_url: ~
+    decisions_council_url: ~
+    decisions_exec_url: ~
+    youtube_channel_id: ~
+    parser: "generic"
+    risk_threshold_uah: 10000000
+
+collectors:
+  odesa.sessions:
+    enabled: true
+    group: council
+  odesa.personnel:
+    enabled: true
+    group: council
+  odesa.trips:
+    enabled: true
+    group: council
+  odesa.omva:
+    enabled: true
+    group: council
+  odesa.vykonkom:
+    enabled: true
+    group: council
+  odesa.commissions:
+    enabled: true
+    group: council
+  odesa.decisions:
+    enabled: true
+    group: risk_analysis
+  mykolaiv.sessions:
+    enabled: true
+    group: council
+  mykolaiv.vykonkom:
+    enabled: true
+    group: council
+  mykolaiv.commissions:
+    enabled: true
+    group: council
+  mykolaiv.decisions:
+    enabled: true
+    group: risk_analysis
+  kherson.decisions:
+    enabled: true
+    group: risk_analysis
+  nazk.declarations:
+    enabled: true
+    group: declarations
+  nazk.checks:
+    enabled: true
+    group: declarations
+  youtube.compliance:
+    enabled: true
+    group: risk_analysis
+
+analyzers:
+  risk_keywords:
+    enabled: true
+  youtube_compliance:
+    enabled: true
+  publish_delay:
+    enabled: true
+  newsworthiness:
+    enabled: true
+
+telegram:
+  token: "${TELEGRAM_BOT_TOKEN}"
+  parse_mode: "HTML"
+  rate_limit_sec: 1.5
+
+cadence:
+  news_per_day: 3
+  analytics_per_week: 2
+  investigations_per_month: 1
+
+topics:
+  priority:
+    - corruption
+    - declarations
+    - courts
+    - budget
+    - procurement
+    - military
+    - ecology
+  geography_weight:
+    odesa: 1.0
+    mykolaiv: 0.8
+    kherson: 0.6
+
+editorial:
+  headline_limit_news: 100
+  headline_limit_analytics: 120
+  lede_limit: 160
+  lede_critical_limit: 200
+  news_min_chars: 1200
+  analytics_links_per_1000: 2
+  alert_below_score: 8
+
+infoprivid:
+  enabled: true
+  daily_digest_hour: 9
+  telegram_chat_id: "${EDITOR_CHAT_ID}"
+  max_items: 5
+  min_risk_level: "medium"
+
+nazk:
+  base_url: "https://public-api.nazk.gov.ua/v2"
+  request_timeout_sec: 30
+  max_pages_per_source: 5
+  page_size_hint: 20
+  lookback_hours_first_run: 24
+  overlap_buffer_hours: 2
+  public_view_url: "https://public.nazk.gov.ua/documents/{doc_id}"
+
+files:
+  people_csv: "data/people.csv"
+  institutions_csv: "data/institutions.csv"
+  state_json: "state/state.json"
+
+risk_keywords:
+  - "земельн"
+  - "оренд"
+  - "приватизац"
+  - "відчужен"
+  - "комунальн"
+  - "концесі"
+  - "передач"
+  - "продаж"
+  - "безоплатн"
+  - "пільг"
+  - "реконструкц"
+  - "будівництв"

@@ -1,0 +1,37 @@
+name: Risk Analysis (daily)
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # 08:00 Kyiv (UTC+2 winter) / 09:00 (UTC+3 summer)
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run risk analysis
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ODESA: ${{ secrets.TELEGRAM_CHAT_ODESA }}
+          TELEGRAM_CHAT_MYKOLAIV: ${{ secrets.TELEGRAM_CHAT_MYKOLAIV }}
+          TELEGRAM_CHAT_KHERSON: ${{ secrets.TELEGRAM_CHAT_KHERSON }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: python -m scripts.run_pipeline --filter risk_analysis
+
+      - name: Commit state and reports
+        run: |
+          git config user.name "RadaWatch Bot"
+          git config user.email "bot@cpi.org.ua"
+          git add state/ reports/
+          git diff --cached --quiet || git commit -m "state: risk analysis $(date -u +%Y-%m-%dT%H:%M)"
+          git push

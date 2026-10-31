@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.env
+*.env
+.venv/
+venv/
+.idea/
+.vscode/
+*.swp
+*.swo
+state/document_versions/
+reports/
+
+# Legacy bot repos (kept as reference, not part of unified pipeline)
+telegram-bot/
+omr-monitor/
+declaration-watcher/
