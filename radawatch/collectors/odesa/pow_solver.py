@@ -1,68 +1,79 @@
 """PoW (Proof-of-Work) solver for omr.gov.ua anti-bot protection.
 
-Ported from telegram-bot/fetch.py. The site requires solving a SHA-256
-puzzle before granting access (2waf protection). Each request needs:
-1. GET the URL → receive a PoW challenge via Set-Cookie (notbot=...)
-2. Brute-force a SHA-256 hash starting with required leading zeros
-3. Re-request with the solution cookie (pow-result=...)
+Ported from telegram-bot/fetch.py. The site serves a 2waf JS challenge page
+(status 503) containing:
+  - const prefix = "..."
+  - const suffixLen = N
+  - const hash4find = "..."
+  - setCookie('notbot','...')
+We brute-force a suffix so sha256(prefix+suffix) == hash4find, then set
+cookies notbot + pow-result (base64 of prefix+suffix) and re-request.
 """
 
 from __future__ import annotations
 
+import base64
 import hashlib
+import itertools
 import logging
 import re
-import string
 import time
-from base64 import b64encode
 
 import requests
 
 log = logging.getLogger("radawatch.odesa.pow")
 
-_SESSION = requests.Session()
-_SESSION.headers["User-Agent"] = "Mozilla/5.0 (compatible; radawatch/2.0)"
+UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
 
-CHARSET = b"01"
+CHARS = "01"
 POW_DELAY = 6
 
+_session = requests.Session()
+_session.headers.update({
+    "User-Agent": UA,
+    "Accept-Language": "uk,en;q=0.9",
+    "Accept": "text/html,application/xhtml+xml",
+})
 
-def _solve_pow(challenge: str, difficulty: int) -> str:
-    prefix = "0" * difficulty
-    nonce = 0
-    while True:
-        candidate = f"{challenge}{nonce}".encode()
-        h = hashlib.sha256(candidate).hexdigest()
-        if h.startswith(prefix):
-            return str(nonce)
-        nonce += 1
+
+def _is_challenge(html: str) -> bool:
+    return "pow-result" in html and "hash4find" in html
+
+
+def _solve(html: str) -> tuple[str, str]:
+    """Parse JS challenge and brute-force the solution."""
+    prefix = re.search(r'const prefix\s*=\s*"([^"]+)"', html).group(1)
+    suffix_len = int(re.search(r'const suffixLen\s*=\s*(\d+)', html).group(1))
+    target = re.search(r'const hash4find\s*=\s*"([^"]+)"', html).group(1)
+    notbot = re.search(r"setCookie\('notbot','([^']+)'\)", html).group(1)
+
+    for combo in itertools.product(CHARS, repeat=suffix_len):
+        s = prefix + "".join(combo)
+        if hashlib.sha256(s.encode()).hexdigest() == target:
+            pow_result = base64.b64encode(s.encode()).decode()
+            return notbot, pow_result
+
+    raise RuntimeError("PoW solution not found")
 
 
 def get(url: str, retries: int = 4) -> str:
     for attempt in range(retries):
-        resp = _SESSION.get(url, timeout=30)
-        if resp.status_code == 200 and "notbot" not in resp.cookies:
-            return resp.text
+        resp = _session.get(url, timeout=60)
+        html = resp.text
+        if not _is_challenge(html):
+            return html
 
-        notbot = resp.cookies.get("notbot", "")
-        if not notbot:
-            m = re.search(r'notbot=([^;\s]+)', resp.headers.get("Set-Cookie", ""))
-            notbot = m.group(1) if m else ""
+        log.debug("PoW challenge on %s, attempt %d/%d", url, attempt + 1, retries)
+        notbot, pow_result = _solve(html)
+        _session.cookies.set("notbot", notbot, domain="omr.gov.ua", path="/")
+        _session.cookies.set("pow-result", pow_result, domain="omr.gov.ua", path="/")
+        time.sleep(POW_DELAY)
 
-        if notbot:
-            parts = notbot.split(".")
-            if len(parts) >= 2:
-                challenge = parts[0]
-                difficulty = int(parts[1]) if parts[1].isdigit() else 5
-                log.debug("PoW challenge: difficulty=%d, attempt %d/%d", difficulty, attempt + 1, retries)
-                solution = _solve_pow(challenge, difficulty)
-                _SESSION.cookies.set("pow-result", solution)
-                _SESSION.cookies.set("notbot", notbot)
-                time.sleep(POW_DELAY)
-                resp2 = _SESSION.get(url, timeout=30)
-                if resp2.status_code == 200:
-                    return resp2.text
-        else:
-            time.sleep(POW_DELAY)
-
-    raise RuntimeError(f"PoW solver failed after {retries} retries: {url}")
+    resp = _session.get(url, timeout=60)
+    html = resp.text
+    if _is_challenge(html):
+        raise RuntimeError(f"Still blocked after {retries} attempts: {url}")
+    return html
