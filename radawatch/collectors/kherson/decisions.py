@@ -63,6 +63,7 @@ class KhersonDecisionsCollector(BaseCollector):
             log.warning("Failed to fetch %s: %s", url, exc)
             return []
 
+        resp.encoding = resp.apparent_encoding or "utf-8"
         soup = BeautifulSoup(resp.text, "html.parser")
         events = []
 
