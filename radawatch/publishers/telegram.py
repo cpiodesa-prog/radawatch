@@ -20,9 +20,13 @@ API = "https://api.telegram.org/bot{token}/sendMessage"
 
 
 class TelegramPublisher(BasePublisher):
-    def __init__(self, token: str | None = None, chat_id: str | None = None):
+    def __init__(self, token: str | None = None, chat_id: str | None = None, config=None):
         self._token = token or os.environ.get("TELEGRAM_BOT_TOKEN", "")
         self._chat_id = chat_id or os.environ.get("TELEGRAM_CHAT_ID", "")
+
+    @property
+    def publisher_id(self) -> str:
+        return "telegram"
 
     def publish(self, draft: Draft, events: list[Event], analyses: list[Analysis]) -> bool:
         return self.send(draft.body_html)
