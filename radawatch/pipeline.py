@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import logging
+import signal
+import threading
 from typing import Optional
 
 from .config import Config
+
+COLLECTOR_TIMEOUT = 300  # 5 minutes per collector
 from .models import Analysis, Draft, Event, Infoprivid, VerificationResult
 from .state import StateManager
 
@@ -31,6 +35,26 @@ class Pipeline:
 
     def register_verifier(self, verifier):
         self._verifiers.append(verifier)
+
+    @staticmethod
+    def _run_with_timeout(fn, timeout_sec: int, label: str):
+        result = []
+        error = []
+
+        def target():
+            try:
+                result.append(fn())
+            except Exception as e:
+                error.append(e)
+
+        t = threading.Thread(target=target, daemon=True)
+        t.start()
+        t.join(timeout=timeout_sec)
+        if t.is_alive():
+            raise TimeoutError(f"{label} exceeded {timeout_sec}s")
+        if error:
+            raise error[0]
+        return result[0] if result else []
 
     def register_drafter(self, drafter):
         self._drafters.append(drafter)
@@ -66,10 +90,13 @@ class Pipeline:
 
             log.info("Collecting from %s", src)
             try:
-                events = collector.collect()
+                events = self._run_with_timeout(collector.collect, COLLECTOR_TIMEOUT, src)
                 new_events = [e for e in events if not self.state.is_seen(e.id)]
                 log.info("  %d new events (of %d total)", len(new_events), len(events))
                 all_events.extend(new_events)
+            except TimeoutError:
+                log.error("  Collector %s timed out after %ds", src, COLLECTOR_TIMEOUT)
+                results["errors"].append({"stage": "collect", "source": src, "error": f"timeout ({COLLECTOR_TIMEOUT}s)"})
             except Exception as exc:
                 log.error("  Collector %s failed: %s", src, exc)
                 results["errors"].append({"stage": "collect", "source": src, "error": str(exc)})

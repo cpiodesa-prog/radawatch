@@ -25,7 +25,7 @@ log = logging.getLogger("radawatch.nazk.checks")
 
 PAGE_URL = "https://nazk.gov.ua/uk/category/povni-perevirky/"
 PER_PAGE = 500
-MAX_PAGES = 600
+MAX_PAGES = 10
 REGION_STEMS = ("одес", "миколаїв", "херсон")
 HEADERS = {
     "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
