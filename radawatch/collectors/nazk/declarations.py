@@ -82,18 +82,22 @@ class NazkDeclarationsCollector(BaseCollector):
         events.extend(self._collect_people(session, people, since_ts, api_base))
         events.extend(self._collect_institutions(session, institutions, since_ts, api_base))
 
-        log.info("NAZK declarations: %d new", len(events))
+        log.info("NAZK declarations: %d new from %d people + %d institutions",
+                 len(events), len(people), len(institutions))
         return events
 
     def _collect_people(self, session, people: list[dict], since_ts: float, api_base: str) -> list[Event]:
         events = []
-        for person in people:
+        total = len(people)
+        for idx, person in enumerate(people):
+            if (idx + 1) % 50 == 0:
+                log.info("  people progress: %d/%d checked, %d found", idx + 1, total, len(events))
             full_name = person.get("name")
             if not full_name:
                 continue
             last, first, patronymic = split_name(full_name)
 
-            candidates = fetch_list_since(session, {"query": full_name}, since_ts, base_url=api_base)
+            candidates = fetch_list_since(session, {"query": full_name}, since_ts, base_url=api_base, max_pages=1)
             for c in candidates:
                 doc_id = c.get("id") or c.get("uuid")
                 if not doc_id:

@@ -10,6 +10,8 @@ from typing import Optional
 from .config import Config
 
 COLLECTOR_TIMEOUT = 300  # 5 minutes per collector
+SLOW_COLLECTOR_TIMEOUT = 600  # 10 minutes for large collectors (nazk.declarations)
+SLOW_COLLECTORS = {"nazk.declarations"}
 from .models import Analysis, Draft, Event, Infoprivid, VerificationResult
 from .state import StateManager
 
@@ -88,9 +90,10 @@ class Pipeline:
             if collector_filter and cfg.get("group") not in collector_filter:
                 continue
 
-            log.info("Collecting from %s", src)
+            timeout = SLOW_COLLECTOR_TIMEOUT if src in SLOW_COLLECTORS else COLLECTOR_TIMEOUT
+            log.info("Collecting from %s (timeout %ds)", src, timeout)
             try:
-                events = self._run_with_timeout(collector.collect, COLLECTOR_TIMEOUT, src)
+                events = self._run_with_timeout(collector.collect, timeout, src)
                 new_events = [e for e in events if not self.state.is_seen(e.id)]
                 log.info("  %d new events (of %d total)", len(new_events), len(events))
                 all_events.extend(new_events)

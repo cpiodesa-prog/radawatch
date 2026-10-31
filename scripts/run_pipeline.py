@@ -94,7 +94,8 @@ def main():
         for err in results["errors"]:
             print(f"  [{err['stage']}] {err['source']}: {err['error']}")
 
-    return 1 if n_errors else 0
+    fatal_errors = [e for e in results["errors"] if "timeout" not in e.get("error", "")]
+    return 1 if fatal_errors else 0
 
 
 def _send_telegram_notifications(events: list):

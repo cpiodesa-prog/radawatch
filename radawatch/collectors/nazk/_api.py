@@ -15,7 +15,7 @@ import requests
 log = logging.getLogger("radawatch.nazk.api")
 
 DEFAULT_BASE_URL = "https://public-api.nazk.gov.ua/v2"
-DEFAULT_TIMEOUT = 30
+DEFAULT_TIMEOUT = 15
 DEFAULT_MAX_PAGES = 5
 DEFAULT_PAGE_SIZE = 20
 
