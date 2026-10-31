@@ -82,6 +82,8 @@ def main():
             if msg:
                 print("----")
                 print(msg)
+    else:
+        _send_telegram_notifications(results["events"])
 
     n_events = len(results["events"])
     n_errors = len(results["errors"])
@@ -93,6 +95,42 @@ def main():
             print(f"  [{err['stage']}] {err['source']}: {err['error']}")
 
     return 1 if n_errors else 0
+
+
+def _send_telegram_notifications(events: list):
+    """Send each event to the appropriate Telegram chat based on city/source."""
+    import os
+
+    chat_map = {
+        "odesa": os.environ.get("TELEGRAM_CHAT_ODESA", ""),
+        "mykolaiv": os.environ.get("TELEGRAM_CHAT_MYKOLAIV", ""),
+        "kherson": os.environ.get("TELEGRAM_CHAT_KHERSON", ""),
+    }
+    declarations_chat = os.environ.get("TELEGRAM_CHAT_DECLARATIONS", "")
+
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    if not token:
+        return
+
+    tg = TelegramPublisher(token=token)
+    sent = 0
+
+    for event in events:
+        msg = format_event(event)
+        if not msg:
+            continue
+
+        if event.source.startswith("nazk."):
+            chat_id = declarations_chat
+        else:
+            chat_id = chat_map.get(event.city, "")
+
+        if chat_id:
+            if tg.send(msg, chat_id=chat_id):
+                sent += 1
+
+    if sent:
+        logging.getLogger("radawatch").info("Sent %d Telegram notifications", sent)
 
 
 if __name__ == "__main__":

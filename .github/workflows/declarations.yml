@@ -21,7 +21,7 @@ jobs:
 
       - name: Run declaration collectors
         env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_DECLARATIONS: ${{ secrets.TELEGRAM_CHAT_DECLARATIONS }}
         run: python -m scripts.run_pipeline --filter declarations
 
