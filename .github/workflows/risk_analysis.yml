@@ -32,6 +32,6 @@ jobs:
         run: |
           git config user.name "RadaWatch Bot"
           git config user.email "bot@cpi.org.ua"
-          git add state/ reports/
+          git add state/ reports/ || true
           git diff --cached --quiet || git commit -m "state: risk analysis $(date -u +%Y-%m-%dT%H:%M)"
-          git push
+          git diff --cached --quiet 2>/dev/null || git push

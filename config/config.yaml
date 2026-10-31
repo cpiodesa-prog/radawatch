@@ -6,8 +6,8 @@ cities:
     telegram_chat_id: "${TELEGRAM_CHAT_ODESA}"
     rss_url: ~
     commissions_url: "https://deputat.omr.gov.ua/commissions/schedule/"
-    decisions_council_url: "https://deputat.omr.gov.ua/decisions/"
-    decisions_exec_url: ~
+    decisions_council_url: ~
+    decisions_exec_url: "https://omr.gov.ua/ua/acts/projects/committee/"
     youtube_channel_id: ~
     parser: "odesa"
     risk_threshold_uah: 10000000
@@ -15,11 +15,11 @@ cities:
   mykolaiv:
     name: "Миколаївська міська рада"
     telegram_chat_id: "${TELEGRAM_CHAT_MYKOLAIV}"
-    rss_url: ~
-    commissions_url: "https://mkrada.gov.ua/commissions/"
-    decisions_council_url: "https://mkrada.gov.ua/decisions/"
-    decisions_exec_url: ~
-    youtube_channel_id: ~
+    rss_url: "https://mkrada.gov.ua/rss/"
+    commissions_url: "https://mkrada.gov.ua/content/poryadok-denniy-zasidan-postiynih-komisiy-miskoi-radi.html"
+    decisions_council_url: "https://mkrada.gov.ua/content/proekti-rishen-miskradi.html"
+    decisions_exec_url: "https://mkrada.gov.ua/content/proekti-rishen-vikonkomu.html"
+    youtube_channel_id: "UC2LMIViWvMwHm7uWXT9JY6A"
     parser: "generic"
     risk_threshold_uah: 10000000
 
@@ -28,7 +28,7 @@ cities:
     telegram_chat_id: "${TELEGRAM_CHAT_KHERSON}"
     rss_url: ~
     commissions_url: ~
-    decisions_council_url: ~
+    decisions_council_url: "https://krprada.gov.ua/rishennya/"
     decisions_exec_url: ~
     youtube_channel_id: ~
     parser: "generic"
