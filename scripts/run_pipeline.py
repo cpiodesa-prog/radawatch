@@ -35,6 +35,7 @@ from radawatch.intelligence.document_tracker import DocumentTracker
 from radawatch.drafters.telegram_formatter import format_event
 from radawatch.drafters.infoprivid import format_digest
 from radawatch.publishers.telegram import TelegramPublisher
+from radawatch.analyzers.noise_filter import NoiseFilter
 
 
 def main():
@@ -87,7 +88,7 @@ def main():
                 print("----")
                 print(msg)
     else:
-        _send_telegram_notifications(results["events"])
+        _send_telegram_notifications(results["events"], state)
         _send_intelligence_alerts(results["events"])
         _send_infoprivid_digest(results.get("infoprivids", []), results["events"])
 
@@ -104,7 +105,7 @@ def main():
     return 1 if fatal_errors else 0
 
 
-def _send_telegram_notifications(events: list):
+def _send_telegram_notifications(events: list, state=None):
     """Send each event to the appropriate Telegram chat based on city/source."""
     import os
 
@@ -120,9 +121,15 @@ def _send_telegram_notifications(events: list):
         return
 
     tg = TelegramPublisher(token=token)
+    noise = NoiseFilter(state=state)
     sent = 0
+    filtered = 0
 
     for event in events:
+        if noise.is_noise(event):
+            filtered += 1
+            continue
+
         msg = format_event(event)
         if not msg:
             continue
@@ -136,8 +143,11 @@ def _send_telegram_notifications(events: list):
             if tg.send(msg, chat_id=chat_id):
                 sent += 1
 
+    log = logging.getLogger("radawatch")
     if sent:
-        logging.getLogger("radawatch").info("Sent %d Telegram notifications", sent)
+        log.info("Sent %d Telegram notifications", sent)
+    if filtered:
+        log.info("Filtered %d routine land permits (noise)", filtered)
 
 
 def _send_intelligence_alerts(events: list):
