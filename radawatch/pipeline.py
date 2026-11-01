@@ -10,8 +10,8 @@ from typing import Optional
 from .config import Config
 
 COLLECTOR_TIMEOUT = 300  # 5 minutes per collector
-SLOW_COLLECTOR_TIMEOUT = 600
-SLOW_COLLECTORS = set()
+SLOW_COLLECTOR_TIMEOUT = 7200  # 2 hours for NAZK declarations (624 people, API returns 403 intermittently)
+SLOW_COLLECTORS = {"nazk.declarations"}
 FIRST_RUN_CAP = 50  # max new events per collector on first run (seed the rest)
 from .models import Analysis, Draft, Event, Infoprivid, VerificationResult
 from .state import StateManager
