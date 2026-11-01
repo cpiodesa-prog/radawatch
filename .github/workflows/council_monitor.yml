@@ -5,6 +5,9 @@ on:
     - cron: "0 8,14 * * *"   # 10:00 + 16:00 Kyiv (UTC+2 winter) / 11:00 + 17:00 (UTC+3 summer)
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   monitor:
     runs-on: ubuntu-latest
@@ -26,6 +29,7 @@ jobs:
           TELEGRAM_CHAT_ODESA: ${{ secrets.TELEGRAM_CHAT_ODESA }}
           TELEGRAM_CHAT_MYKOLAIV: ${{ secrets.TELEGRAM_CHAT_MYKOLAIV }}
           TELEGRAM_CHAT_KHERSON: ${{ secrets.TELEGRAM_CHAT_KHERSON }}
+          EDITOR_CHAT_ID: ${{ secrets.EDITOR_CHAT_ID }}
         run: python -m scripts.run_pipeline --filter council
 
       - name: Commit state

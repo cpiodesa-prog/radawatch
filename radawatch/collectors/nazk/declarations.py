@@ -174,13 +174,25 @@ class NazkDeclarationsCollector(BaseCollector):
 
     def _collect_institutions(self, session, institutions: list[dict], since_ts: float, api_base: str) -> list[Event]:
         events = []
+        consecutive_403 = 0
         for inst in institutions:
             edrpou = inst.get("edrpou")
             if not edrpou:
                 continue
             label = f"{inst.get('name', '?')} ({inst.get('region', '')})"
 
-            candidates = fetch_list_since(session, {"workPlaceEdrpou": edrpou}, since_ts, base_url=api_base)
+            try:
+                candidates = fetch_list_since(session, {"workPlaceEdrpou": edrpou}, since_ts, base_url=api_base)
+                consecutive_403 = 0
+            except RateLimitError:
+                consecutive_403 += 1
+                log.warning("  institutions 403 on %s (streak: %d)", label, consecutive_403)
+                if consecutive_403 >= MAX_CONSECUTIVE_403:
+                    log.error("  %d consecutive 403s — stopping institutions", MAX_CONSECUTIVE_403)
+                    break
+                time.sleep(RATE_LIMIT_BACKOFF)
+                continue
+
             for c in candidates:
                 doc_id = c.get("id") or c.get("uuid")
                 if not doc_id:

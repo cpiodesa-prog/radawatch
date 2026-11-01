@@ -161,8 +161,17 @@ class Pipeline:
             except Exception as exc:
                 log.error("  Intelligence %s failed: %s", type(intel).__name__, exc)
 
-        # 4. TELEGRAM NOTIFICATIONS (existing format, with source links)
+        # 4. TELEGRAM NOTIFICATIONS (handled by run_pipeline.py)
+
         # 5. INFOPRIVIDS
+        from .drafters.infoprivid import suggest_infoprivids
+        try:
+            infoprivids = suggest_infoprivids(unique_events, all_analyses, self.state)
+            results["infoprivids"] = infoprivids
+            log.info("Suggested %d infoprivids", len(infoprivids))
+        except Exception as exc:
+            log.error("Infoprivid suggestion failed: %s", exc)
+
         # 6. DRAFT
         all_drafts: list[Draft] = []
         for drafter in self._drafters:

@@ -30,6 +30,7 @@ from radawatch.intelligence.person_dossier import PersonDossierBuilder
 from radawatch.intelligence.decision_analyzer import DecisionAnalyzer
 from radawatch.intelligence.document_tracker import DocumentTracker
 from radawatch.drafters.telegram_formatter import format_event
+from radawatch.drafters.infoprivid import format_digest
 from radawatch.publishers.telegram import TelegramPublisher
 
 
@@ -84,6 +85,7 @@ def main():
                 print(msg)
     else:
         _send_telegram_notifications(results["events"])
+        _send_infoprivid_digest(results.get("infoprivids", []), results["events"])
 
     n_events = len(results["events"])
     n_errors = len(results["errors"])
@@ -132,6 +134,23 @@ def _send_telegram_notifications(events: list):
 
     if sent:
         logging.getLogger("radawatch").info("Sent %d Telegram notifications", sent)
+
+
+def _send_infoprivid_digest(infoprivids: list, events: list):
+    import os
+
+    if not infoprivids:
+        return
+
+    editor_chat = os.environ.get("EDITOR_CHAT_ID", "")
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    if not token or not editor_chat:
+        return
+
+    digest = format_digest(infoprivids, events)
+    tg = TelegramPublisher(token=token)
+    if tg.send(digest, chat_id=editor_chat, disable_preview=True):
+        logging.getLogger("radawatch").info("Sent infoprivid digest (%d items) to editor", len(infoprivids))
 
 
 if __name__ == "__main__":

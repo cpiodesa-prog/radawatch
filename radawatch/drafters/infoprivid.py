@@ -54,9 +54,15 @@ def suggest_infoprivids(
     candidates.sort(key=lambda x: x[2], reverse=True)
     candidates = candidates[:max_items]
 
+    findings_map: dict[str, list] = {}
+    for a in analyses:
+        if a.analyzer == "risk_keywords" and a.findings:
+            findings_map[a.event_id] = a.findings
+
     result = []
     for event, risk, newsworthiness in candidates:
-        angle = _suggest_angle(event, risk)
+        findings = findings_map.get(event.id, [])
+        angle = _suggest_angle(event, risk, findings)
         suggested_type = "analytics" if newsworthiness > 0.7 and risk in ("high", "medium") else "news"
 
         result.append(Infoprivid(
@@ -67,6 +73,9 @@ def suggest_infoprivids(
             angle=angle,
             suggested_type=suggested_type,
             source_urls=[event.url] if event.url else [],
+            city=event.city,
+            title=event.title,
+            event_date=event.event_date,
         ))
 
     return result
@@ -81,18 +90,22 @@ def format_digest(infoprivids: list[Infoprivid], events: list[Event]) -> str:
 
     for i, ip in enumerate(infoprivids, 1):
         event = event_map.get(ip.event_id)
-        title = esc(event.title) if event else "(подія)"
-        city = esc(event.city) if event else ""
+        title = esc(event.title if event else ip.title or "(подія)")
+        city_key = event.city if event else ip.city
+        city_name = CITY_NAMES.get(city_key, city_key)
+        cat_label = CATEGORY_LABELS.get(ip.topic, ip.topic)
         icon = RISK_ICONS.get(ip.risk_level, "⚪")
         level = ip.risk_level.upper()
         url = ip.source_urls[0] if ip.source_urls else ""
+        type_tag = "📊" if ip.suggested_type == "analytics" else "📰"
 
+        city_part = f"{city_name} · " if city_name else ""
         block = [
             f"{i}. {icon} [{level}] {title}",
-            f"   {city} · {esc(ip.topic)} · {datetime.now().strftime('%d.%m.%Y')}",
+            f"   {city_part}{cat_label} · {type_tag} {ip.suggested_type}",
         ]
         if url:
-            block.append(f"   → Посилання: {url}")
+            block.append(f"   → <a href=\"{url}\">Першоджерело</a>")
         if ip.angle:
             block.append(f"   💡 Кут: {esc(ip.angle)}")
 
@@ -105,7 +118,21 @@ def _risk_rank(level: str) -> int:
     return {"none": 0, "low": 1, "medium": 2, "high": 3}.get(level, 0)
 
 
-def _suggest_angle(event: Event, risk: str) -> str:
+CITY_NAMES = {"odesa": "Одеса", "mykolaiv": "Миколаїв", "kherson": "Херсон", "national": ""}
+
+CATEGORY_LABELS = {
+    "session": "сесія ради",
+    "personnel": "кадрове рішення",
+    "decision": "рішення ради/виконкому",
+    "declaration": "декларація",
+    "nazk_check": "перевірка НАЗК",
+    "commission": "засідання комісії",
+    "vykonkom": "виконком",
+    "trip": "відрядження",
+}
+
+
+def _suggest_angle(event: Event, risk: str, findings: list = None) -> str:
     cat = event.category
     data = event.data
 
@@ -114,7 +141,19 @@ def _suggest_angle(event: Event, risk: str) -> str:
     if cat == "declaration":
         return f"Порівняти з попередньою декларацією — {data.get('declaration_type', '')}"
     if cat == "decision" and risk in ("high", "medium"):
-        return "Хто отримує, зв'язок із попередніми рішеннями, ринкова ціна"
+        parts = ["Хто отримує, зв'язок із попередніми рішеннями"]
+        if findings:
+            keywords = list({f.keyword for f in findings[:3]})
+            amounts = [f.amount_uah for f in findings if f.amount_uah]
+            if amounts:
+                max_amt = max(amounts)
+                if max_amt >= 1_000_000:
+                    parts.append(f"сума {max_amt/1_000_000:.1f} млн грн")
+                else:
+                    parts.append(f"сума {max_amt:,.0f} грн")
+            if keywords:
+                parts.append(f"ключові слова: {', '.join(keywords)}")
+        return "; ".join(parts)
     if cat == "nazk_check":
         return f"Результат перевірки: {data.get('result', '?')} — наслідки для посадовця"
     if cat == "commission":
