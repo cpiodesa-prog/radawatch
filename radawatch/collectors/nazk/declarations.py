@@ -20,13 +20,18 @@ from ...models import Event
 from ...state import StateManager
 from ..base import BaseCollector
 from .. import register_collector
-from ._api import make_session, fetch_list_since, api_get_full
+from ._api import make_session, fetch_list_since, api_get_full, RateLimitError
 from ._verification import (
     full_name_of, split_name, name_matches,
     region_matches_workplace, position_contains, step1,
 )
 
 log = logging.getLogger("radawatch.nazk.declarations")
+
+PEOPLE_BATCH_SIZE = 100
+REQUEST_DELAY = 1.5
+RATE_LIMIT_BACKOFF = 30
+MAX_CONSECUTIVE_403 = 3
 
 DECLARATION_TYPE_LABELS = {
     0: "Повідомлення про суттєві зміни",
@@ -79,25 +84,50 @@ class NazkDeclarationsCollector(BaseCollector):
         since_ts = time.time() - 24 * 3600  # last 24 hours by default
 
         events = []
-        events.extend(self._collect_people(session, people, since_ts, api_base))
+        events.extend(self._collect_people_batch(session, people, since_ts, api_base))
         events.extend(self._collect_institutions(session, institutions, since_ts, api_base))
 
         log.info("NAZK declarations: %d new from %d people + %d institutions",
                  len(events), len(people), len(institutions))
         return events
 
-    def _collect_people(self, session, people: list[dict], since_ts: float, api_base: str) -> list[Event]:
-        events = []
+    def _collect_people_batch(self, session, people: list[dict], since_ts: float, api_base: str) -> list[Event]:
         total = len(people)
-        for idx, person in enumerate(people):
-            if (idx + 1) % 50 == 0:
-                log.info("  people progress: %d/%d checked, %d found", idx + 1, total, len(events))
+        offset_key = "nazk_people_offset"
+        meta = self._data_get("collector_meta", {})
+        offset = meta.get(offset_key, 0) % total if total else 0
+
+        batch = people[offset:offset + PEOPLE_BATCH_SIZE]
+        end_idx = offset + len(batch)
+        log.info("People batch: %d..%d of %d (batch size %d)",
+                 offset, end_idx, total, len(batch))
+
+        events = []
+        consecutive_403 = 0
+
+        for i, person in enumerate(batch):
             full_name = person.get("name")
             if not full_name:
                 continue
-            last, first, patronymic = split_name(full_name)
 
-            candidates = fetch_list_since(session, {"query": full_name}, since_ts, base_url=api_base, max_pages=1)
+            if i > 0:
+                time.sleep(REQUEST_DELAY)
+
+            last, first, patronymic = split_name(full_name)
+            try:
+                candidates = fetch_list_since(session, {"query": full_name}, since_ts, base_url=api_base, max_pages=1)
+                consecutive_403 = 0
+            except RateLimitError:
+                consecutive_403 += 1
+                log.warning("  403 on person %d/%d (%s), backoff %ds (streak: %d)",
+                            offset + i + 1, total, full_name, RATE_LIMIT_BACKOFF, consecutive_403)
+                if consecutive_403 >= MAX_CONSECUTIVE_403:
+                    log.error("  %d consecutive 403s — stopping batch at person %d", MAX_CONSECUTIVE_403, offset + i)
+                    end_idx = offset + i
+                    break
+                time.sleep(RATE_LIMIT_BACKOFF)
+                continue
+
             for c in candidates:
                 doc_id = c.get("id") or c.get("uuid")
                 if not doc_id:
@@ -109,7 +139,7 @@ class NazkDeclarationsCollector(BaseCollector):
                 doc = api_get_full(session, doc_id, base_url=api_base)
                 if not doc:
                     continue
-                time.sleep(0.2)
+                time.sleep(0.5)
 
                 if not name_matches(doc, last, first, patronymic):
                     self.state.mark_seen(eid)
@@ -126,7 +156,21 @@ class NazkDeclarationsCollector(BaseCollector):
 
                 events.append(self._make_event(doc, doc_id, f"зі списку: {full_name}"))
 
+            if (offset + i + 1) % 25 == 0:
+                log.info("  progress: %d/%d checked, %d found", offset + i + 1, total, len(events))
+
+        next_offset = end_idx % total
+        meta[offset_key] = next_offset
+        self._data_set("collector_meta", meta)
+        log.info("  batch done, next offset: %d", next_offset)
+
         return events
+
+    def _data_get(self, key: str, default=None):
+        return self.state._data.get(key, default)
+
+    def _data_set(self, key: str, value):
+        self.state._data[key] = value
 
     def _collect_institutions(self, session, institutions: list[dict], since_ts: float, api_base: str) -> list[Event]:
         events = []

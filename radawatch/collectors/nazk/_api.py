@@ -20,6 +20,10 @@ DEFAULT_MAX_PAGES = 5
 DEFAULT_PAGE_SIZE = 20
 
 
+class RateLimitError(Exception):
+    pass
+
+
 def make_session() -> requests.Session:
     s = requests.Session()
     s.headers.update({
@@ -42,8 +46,12 @@ def api_list(session: requests.Session, params: dict,
     for attempt in range(tries):
         try:
             resp = session.get(url, params=params, timeout=timeout)
+            if resp.status_code == 403:
+                raise RateLimitError(f"403 for {params}")
             resp.raise_for_status()
             return resp.json().get("data", [])
+        except RateLimitError:
+            raise
         except Exception as e:
             last_err = e
             time.sleep(1.5 * (attempt + 1))
