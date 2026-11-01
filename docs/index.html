@@ -1,0 +1,504 @@
+<title>RadaWatch</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root {
+  --bg: #f2ebd1;
+  --surface: #faf6e8;
+  --surface-alt: #ede7d2;
+  --border: #d9d1b8;
+  --fg: #121212;
+  --fg-dim: #5a5545;
+  --accent: #c0392b;
+  --accent-dim: rgba(192, 57, 43, 0.1);
+  --green: #27ae60;
+  --green-dim: rgba(39, 174, 96, 0.1);
+  --red: #c0392b;
+  --red-dim: rgba(192, 57, 43, 0.1);
+  --yellow: #d4a017;
+  --yellow-dim: rgba(212, 160, 23, 0.1);
+  --blue: #2980b9;
+  --blue-dim: rgba(41, 128, 185, 0.1);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1a1a16;
+    --surface: #242420;
+    --surface-alt: #2c2c26;
+    --border: #3d3d34;
+    --fg: #f2ebd1;
+    --fg-dim: #9e977f;
+    --accent: #e74c3c;
+    --accent-dim: rgba(231, 76, 60, 0.12);
+    --green: #2ecc71;
+    --green-dim: rgba(46, 204, 113, 0.1);
+    --red: #e74c3c;
+    --red-dim: rgba(231, 76, 60, 0.1);
+    --yellow: #f1c40f;
+    --yellow-dim: rgba(241, 196, 15, 0.1);
+    --blue: #3498db;
+    --blue-dim: rgba(52, 152, 219, 0.1);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1a1a16;
+  --surface: #242420;
+  --surface-alt: #2c2c26;
+  --border: #3d3d34;
+  --fg: #f2ebd1;
+  --fg-dim: #9e977f;
+  --accent: #e74c3c;
+  --accent-dim: rgba(231, 76, 60, 0.12);
+  --green: #2ecc71;
+  --green-dim: rgba(46, 204, 113, 0.1);
+  --red: #e74c3c;
+  --red-dim: rgba(231, 76, 60, 0.1);
+  --yellow: #f1c40f;
+  --yellow-dim: rgba(241, 196, 15, 0.1);
+  --blue: #3498db;
+  --blue-dim: rgba(52, 152, 219, 0.1);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  padding: 0 16px env(safe-area-inset-bottom, 16px);
+  max-width: 480px;
+  margin: 0 auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+.tg-header {
+  background: var(--fg);
+  color: var(--bg);
+  margin: 0 -16px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.tg-header-logo {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: grid; place-items: center;
+  font-size: 15px; font-weight: 700; color: #fff;
+  flex-shrink: 0;
+}
+.tg-header-text h1 {
+  font-size: 17px; font-weight: 600; letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.tg-header-text .tg-sub {
+  font-size: 12px; opacity: 0.7; margin-top: 1px;
+}
+.tg-header .tg-badge {
+  margin-left: auto;
+  font-size: 10px; font-weight: 600;
+  padding: 3px 8px; border-radius: 10px;
+  background: var(--green); color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 16px 0;
+}
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+}
+.stat-label {
+  font-size: 11px; font-weight: 500;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.stat-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 4px;
+}
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.stat-unit {
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 10px;
+}
+.card-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-dim);
+  margin-bottom: 12px;
+}
+
+.wf-list { display: flex; flex-direction: column; gap: 6px; }
+.wf-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface-alt);
+  border-radius: 10px;
+}
+.wf-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.wf-dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.wf-dot.fail { background: var(--red); box-shadow: 0 0 6px var(--red); }
+.wf-dot.run { background: var(--yellow); animation: pulse 1.5s infinite; }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.wf-name { font-size: 13px; font-weight: 500; flex: 1; }
+.wf-meta { font-size: 11px; color: var(--fg-dim); white-space: nowrap; }
+
+.cities {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.city {
+  background: var(--surface-alt);
+  border-radius: 12px;
+  padding: 14px 10px;
+  text-align: center;
+}
+.city-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg-dim);
+  margin-bottom: 4px;
+}
+.city-num {
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.city-bar {
+  height: 3px;
+  border-radius: 2px;
+  margin-top: 8px;
+  background: var(--border);
+  overflow: hidden;
+}
+.city-fill { height: 100%; border-radius: 2px; }
+
+.cadence-list { display: flex; flex-direction: column; gap: 12px; }
+.cad-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 5px;
+}
+.cad-label { font-size: 13px; font-weight: 500; }
+.cad-count { font-size: 12px; font-weight: 600; color: var(--accent); }
+.cad-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-alt);
+  overflow: hidden;
+}
+.cad-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+
+.coll-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+.coll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--surface-alt);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.coll-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.coll-dot.ok { background: var(--green); }
+.coll-name { font-weight: 500; }
+.coll-src { color: var(--fg-dim); font-size: 10px; margin-left: auto; }
+
+.ch-list { display: flex; flex-direction: column; gap: 6px; }
+.ch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface-alt);
+  border-radius: 10px;
+  font-size: 13px;
+}
+.ch-icon {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.ch-name { font-weight: 500; flex: 1; }
+.ch-desc { font-size: 11px; color: var(--fg-dim); }
+
+.bottom-nav {
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  margin: 16px -16px 0;
+  padding: 8px 16px max(8px, env(safe-area-inset-bottom, 0px));
+  display: flex;
+  justify-content: space-around;
+}
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  color: var(--fg-dim);
+  text-decoration: none;
+  padding: 4px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: none; background: none;
+  font-family: inherit;
+}
+.nav-item.active { color: var(--accent); }
+.nav-icon { font-size: 18px; line-height: 1; }
+
+.footer {
+  text-align: center;
+  padding: 16px 0 8px;
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+.footer a { color: var(--accent); text-decoration: none; }
+
+.cpi-stripe {
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--yellow) 50%, var(--green) 100%);
+  margin: 0 -16px;
+}
+</style>
+
+<div class="cpi-stripe"></div>
+<div class="tg-header">
+  <div class="tg-header-logo">RW</div>
+  <div class="tg-header-text">
+    <h1>RadaWatch</h1>
+    <div class="tg-sub">Моніторинг ОМС · ЦПР</div>
+  </div>
+  <span class="tg-badge">Live</span>
+</div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-label">Подій</div>
+    <div class="stat-row">
+      <span class="stat-value" style="color:var(--accent)">15</span>
+      <span class="stat-unit">сьогодні</span>
+    </div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Джерел</div>
+    <div class="stat-row">
+      <span class="stat-value">14</span>
+      <span class="stat-unit">колекторів</span>
+    </div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Помилок</div>
+    <div class="stat-row">
+      <span class="stat-value" style="color:var(--green)">0</span>
+      <span class="stat-unit">останній запуск</span>
+    </div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Надіслано</div>
+    <div class="stat-row">
+      <span class="stat-value">15</span>
+      <span class="stat-unit">Telegram</span>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Workflows</div>
+  <div class="wf-list">
+    <div class="wf-row">
+      <div class="wf-dot ok"></div>
+      <div class="wf-name">Council Monitor</div>
+      <div class="wf-meta">15 подій · 2×/день</div>
+    </div>
+    <div class="wf-row">
+      <div class="wf-dot run"></div>
+      <div class="wf-name">Risk Analysis</div>
+      <div class="wf-meta">running · daily</div>
+    </div>
+    <div class="wf-row">
+      <div class="wf-dot run"></div>
+      <div class="wf-name">Declarations</div>
+      <div class="wf-meta">running · 4×/день</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Події по містах</div>
+  <div class="cities">
+    <div class="city">
+      <div class="city-label">Одеса</div>
+      <div class="city-num">9</div>
+      <div class="city-bar"><div class="city-fill" style="width:60%;background:var(--accent)"></div></div>
+    </div>
+    <div class="city">
+      <div class="city-label">Миколаїв</div>
+      <div class="city-num">6</div>
+      <div class="city-bar"><div class="city-fill" style="width:40%;background:var(--yellow)"></div></div>
+    </div>
+    <div class="city">
+      <div class="city-label">Херсон</div>
+      <div class="city-num">0</div>
+      <div class="city-bar"><div class="city-fill" style="width:0%;background:var(--blue)"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Каденція контенту</div>
+  <div class="cadence-list">
+    <div class="cad-item">
+      <div class="cad-head">
+        <span class="cad-label">Новини / день</span>
+        <span class="cad-count">0 / 3</span>
+      </div>
+      <div class="cad-track"><div class="cad-fill" style="width:0%;background:var(--accent)"></div></div>
+    </div>
+    <div class="cad-item">
+      <div class="cad-head">
+        <span class="cad-label">Аналітика / тиждень</span>
+        <span class="cad-count">0 / 2</span>
+      </div>
+      <div class="cad-track"><div class="cad-fill" style="width:0%;background:var(--yellow)"></div></div>
+    </div>
+    <div class="cad-item">
+      <div class="cad-head">
+        <span class="cad-label">Розслідування / місяць</span>
+        <span class="cad-count">0 / 1</span>
+      </div>
+      <div class="cad-track"><div class="cad-fill" style="width:0%;background:var(--green)"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Колектори · 14</div>
+  <div class="coll-grid">
+    <div class="coll"><div class="coll-dot ok"></div><span class="coll-name">sessions</span><span class="coll-src">одеса</span></div>
+    <div class="coll"><div class="coll-dot ok"></div><span class="coll-name">personnel</span><span class="coll-src">одеса</span></div>
+    <div class="coll"><div class="coll-dot ok"></div><span class="coll-name">commissions</span><span class="coll-src">одеса</span></div>
+    <div class="coll"><div class="coll-dot ok"></div><span class="coll-name">vykonkom</span><span class="coll-src">одеса</span></div>
+    <div class="coll"><div class="coll-dot ok"></div><span class="coll-name">omva</span><span class="coll-src">одеса</span></div>
+    <div class="coll"><div class="coll-dot ok"></div><span class="coll-name">trips</span><span class="coll-src">одеса</span></div>
+    <div class="coll"><div class="coll-dot ok"></div><span class="coll-name">decisions</span><span class="coll-src">одеса</span></div>
+    <div class="coll"><div class="coll-dot ok"></div><span class="coll-name">sessions</span><span class="coll-src">миколаїв</span></div>
+    <div class="coll"><div class="coll-dot ok"></div><span class="coll-name">vykonkom</span><span class="coll-src">миколаїв</span></div>
+    <div class="coll"><div class="coll-dot ok"></div><span class="coll-name">commissions</span><span class="coll-src">миколаїв</span></div>
+    <div class="coll"><div class="coll-dot ok"></div><span class="coll-name">decisions</span><span class="coll-src">миколаїв</span></div>
+    <div class="coll"><div class="coll-dot ok"></div><span class="coll-name">decisions</span><span class="coll-src">херсон</span></div>
+    <div class="coll"><div class="coll-dot ok"></div><span class="coll-name">declarations</span><span class="coll-src">НАЗК</span></div>
+    <div class="coll"><div class="coll-dot ok"></div><span class="coll-name">checks</span><span class="coll-src">НАЗК</span></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Telegram канали</div>
+  <div class="ch-list">
+    <div class="ch-row">
+      <div class="ch-icon" style="background:var(--accent-dim);color:var(--accent)">📡</div>
+      <div>
+        <div class="ch-name">Рада Радар</div>
+        <div class="ch-desc">Одеса + Миколаїв</div>
+      </div>
+    </div>
+    <div class="ch-row">
+      <div class="ch-icon" style="background:var(--blue-dim);color:var(--blue)">👤</div>
+      <div>
+        <div class="ch-name">Особисті</div>
+        <div class="ch-desc">Херсон</div>
+      </div>
+    </div>
+    <div class="ch-row">
+      <div class="ch-icon" style="background:var(--green-dim);color:var(--green)">📋</div>
+      <div>
+        <div class="ch-name">Група декларацій</div>
+        <div class="ch-desc">НАЗК</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-nav">
+  <button class="nav-item active">
+    <span class="nav-icon">📊</span>
+    Дашборд
+  </button>
+  <button class="nav-item">
+    <span class="nav-icon">🔔</span>
+    Сповіщення
+  </button>
+  <button class="nav-item">
+    <span class="nav-icon">⚙️</span>
+    Налаштування
+  </button>
+</div>
+
+<div class="footer">
+  RadaWatch v2.0 · <a href="https://cpi.org.ua">ЦПР</a> · оновлено 31.10.2026
+</div>
+
+<script>
+if (window.Telegram && window.Telegram.WebApp) {
+  const tg = window.Telegram.WebApp;
+  tg.ready();
+  tg.expand();
+  if (tg.colorScheme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+}
+</script>
