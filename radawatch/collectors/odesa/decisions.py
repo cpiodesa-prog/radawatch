@@ -13,16 +13,14 @@ from datetime import datetime
 from typing import Optional
 from urllib.parse import urljoin
 
-import requests
 from bs4 import BeautifulSoup
 
 from ...models import Event, FileRef
 from ..base import BaseCollector
 from .. import register_collector
+from . import pow_solver
 
 log = logging.getLogger("radawatch.odesa.decisions")
-
-HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; radawatch/2.0)"}
 
 
 def _make_id(*parts: str) -> str:
@@ -59,14 +57,12 @@ class OdesaDecisionsCollector(BaseCollector):
 
     def _collect_from_page(self, url: str, body: str) -> list[Event]:
         try:
-            resp = requests.get(url, headers=HEADERS, timeout=30)
-            resp.raise_for_status()
-        except requests.RequestException as exc:
+            html = pow_solver.get(url)
+        except Exception as exc:
             log.warning("Failed to fetch %s: %s", url, exc)
             return []
 
-        resp.encoding = resp.apparent_encoding or "utf-8"
-        soup = BeautifulSoup(resp.text, "html.parser")
+        soup = BeautifulSoup(html, "html.parser")
         events = []
 
         for link_tag in soup.find_all("a", href=True):
