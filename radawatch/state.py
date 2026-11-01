@@ -116,3 +116,7 @@ class StateManager:
 
     def get_document_data(self, doc_id: str, version: int) -> Optional[dict]:
         return self._data.get("document_versions", {}).get(doc_id, {}).get(str(version))
+
+    @property
+    def data(self) -> dict:
+        return self._data

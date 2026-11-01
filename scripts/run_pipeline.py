@@ -26,7 +26,10 @@ from radawatch.analyzers.youtube_compliance import YoutubeComplianceAnalyzer
 from radawatch.analyzers.newsworthiness import NewsworthinessAnalyzer
 from radawatch.verifiers.dedup import DedupVerifier
 from radawatch.verifiers.cross_reference import CrossReferenceVerifier
-from radawatch.intelligence.person_dossier import PersonDossierBuilder
+from radawatch.intelligence.person_dossier import (
+    PersonDossierBuilder, format_dossier_telegram,
+    format_document_diff_telegram, format_decision_analysis_telegram,
+)
 from radawatch.intelligence.decision_analyzer import DecisionAnalyzer
 from radawatch.intelligence.document_tracker import DocumentTracker
 from radawatch.drafters.telegram_formatter import format_event
@@ -85,6 +88,7 @@ def main():
                 print(msg)
     else:
         _send_telegram_notifications(results["events"])
+        _send_intelligence_alerts(results["events"])
         _send_infoprivid_digest(results.get("infoprivids", []), results["events"])
 
     n_events = len(results["events"])
@@ -134,6 +138,47 @@ def _send_telegram_notifications(events: list):
 
     if sent:
         logging.getLogger("radawatch").info("Sent %d Telegram notifications", sent)
+
+
+def _send_intelligence_alerts(events: list):
+    import os
+
+    editor_chat = os.environ.get("EDITOR_CHAT_ID", "")
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    if not token or not editor_chat:
+        return
+
+    chat_map = {
+        "odesa": os.environ.get("TELEGRAM_CHAT_ODESA", ""),
+        "mykolaiv": os.environ.get("TELEGRAM_CHAT_MYKOLAIV", ""),
+        "kherson": os.environ.get("TELEGRAM_CHAT_KHERSON", ""),
+    }
+
+    tg = TelegramPublisher(token=token)
+    sent = 0
+
+    for event in events:
+        dossier = event.data.get("dossier")
+        if dossier:
+            msg = format_dossier_telegram(dossier)
+            if tg.send(msg, chat_id=editor_chat, disable_preview=True):
+                sent += 1
+
+        diff_msg = format_document_diff_telegram(event)
+        if diff_msg:
+            city_chat = chat_map.get(event.city, "")
+            if city_chat:
+                tg.send(diff_msg, chat_id=city_chat, disable_preview=True)
+            if tg.send(diff_msg, chat_id=editor_chat, disable_preview=True):
+                sent += 1
+
+        analysis_msg = format_decision_analysis_telegram(event)
+        if analysis_msg:
+            if tg.send(analysis_msg, chat_id=editor_chat, disable_preview=True):
+                sent += 1
+
+    if sent:
+        logging.getLogger("radawatch").info("Sent %d intelligence alerts", sent)
 
 
 def _send_infoprivid_digest(infoprivids: list, events: list):

@@ -7,9 +7,10 @@ Cross-references: NAZK API for declarations, checks; state for prior events.
 from __future__ import annotations
 
 import logging
+import re
 import time
 
-from ..collectors.nazk._api import make_session, fetch_list_since, api_get_full
+from ..collectors.nazk._api import make_session, fetch_list_since, api_get_full, RateLimitError
 from ..collectors.nazk._verification import full_name_of, name_matches, split_name, step1
 from ..config import Config
 from ..models import Analysis, Event
@@ -17,6 +18,28 @@ from ..state import StateManager
 from ..utils.text import esc
 
 log = logging.getLogger("radawatch.intelligence.dossier")
+
+NAME_RE = re.compile(
+    r"(?:призначенн\w*|звільненн\w*|переведенн\w*|покладенн\w*)\s+"
+    r"((?:[А-ЯІЇЄҐ][а-яіїєґ'`ʼ]+\s+){2,3})",
+    re.IGNORECASE,
+)
+
+
+def extract_person_name(event: Event) -> str | None:
+    name = event.data.get("name") or event.data.get("person_name")
+    if name:
+        return name.strip()
+    for field in ("description", "title"):
+        text = event.data.get(field) or ""
+        m = NAME_RE.search(text)
+        if m:
+            return m.group(1).strip()
+    if event.title:
+        m = NAME_RE.search(event.title)
+        if m:
+            return m.group(1).strip()
+    return None
 
 
 class PersonDossierBuilder:
@@ -26,20 +49,25 @@ class PersonDossierBuilder:
 
     def process(self, events: list[Event], analyses: list[Analysis]) -> None:
         for event in events:
-            if event.category in ("personnel", "declaration"):
-                name = event.data.get("name") or event.data.get("person_name")
-                if name:
-                    dossier = self._build_dossier(name, event)
-                    if dossier:
-                        event.data["dossier"] = dossier
+            if event.category not in ("personnel", "declaration"):
+                continue
+            name = extract_person_name(event)
+            if not name:
+                continue
+            event.data["person_name"] = name
+            dossier = self._build_dossier(name, event)
+            if dossier:
+                event.data["dossier"] = dossier
+                log.info("Built dossier for %s (%d decl, %d prior)",
+                         name, len(dossier["declarations"]), len(dossier["prior_events"]))
 
     def _build_dossier(self, name: str, trigger_event: Event) -> dict | None:
         last, first, patronymic = split_name(name)
         dossier = {
             "name": name,
             "trigger": trigger_event.title,
+            "trigger_url": trigger_event.url,
             "declarations": [],
-            "checks": [],
             "prior_events": [],
         }
 
@@ -56,6 +84,9 @@ class PersonDossierBuilder:
             session = make_session()
             since_ts = time.time() - 365 * 24 * 3600
             candidates = fetch_list_since(session, {"query": name}, since_ts, max_pages=2)
+        except RateLimitError:
+            log.warning("NAZK rate limit while building dossier for %s", name)
+            return []
         except Exception as exc:
             log.warning("Failed to fetch declarations for %s: %s", name, exc)
             return []
@@ -65,7 +96,13 @@ class PersonDossierBuilder:
             doc_id = c.get("id") or c.get("uuid")
             if not doc_id:
                 continue
-            doc = api_get_full(session, doc_id)
+            try:
+                doc = api_get_full(session, doc_id)
+            except RateLimitError:
+                log.warning("NAZK rate limit on doc %s", doc_id)
+                break
+            except Exception:
+                continue
             if not doc:
                 continue
             if not name_matches(doc, last, first, patronymic):
@@ -80,7 +117,7 @@ class PersonDossierBuilder:
                 "workpost": s1.get("workPost", ""),
                 "url": f"https://public.nazk.gov.ua/documents/{doc_id}",
             })
-            time.sleep(0.3)
+            time.sleep(0.5)
 
             if len(results) >= 3:
                 break
@@ -101,19 +138,73 @@ def format_dossier_telegram(dossier: dict) -> str:
     lines = [f"👤 <b>Досьє: {esc(dossier['name'])}</b>"]
 
     if dossier.get("trigger"):
-        lines.append(f"   {esc(dossier['trigger'])}")
+        lines.append(f"   📎 {esc(dossier['trigger'])}")
+    if dossier.get("trigger_url"):
+        lines.append(f"   🔗 {dossier['trigger_url']}")
 
-    for decl in dossier.get("declarations", []):
-        year = decl.get("year", "?")
-        dtype = decl.get("type", "?")
-        url = decl.get("url", "")
-        lines.append(f"\n   📋 Декларація {year}: тип {dtype}")
-        if decl.get("workpost"):
-            lines.append(f"      → {esc(decl['workpost'])}")
-        if url:
-            lines.append(f"      → {url}")
+    if dossier.get("declarations"):
+        lines.append("")
+        for decl in dossier["declarations"]:
+            year = decl.get("year", "?")
+            dtype = decl.get("type", "?")
+            url = decl.get("url", "")
+            lines.append(f"   📋 Декларація {year} (тип {dtype})")
+            if decl.get("workpost"):
+                lines.append(f"      → {esc(decl['workpost'])}")
+            if decl.get("workplace"):
+                lines.append(f"      → {esc(decl['workplace'])}")
+            if url:
+                lines.append(f"      🔗 {url}")
 
-    for prior in dossier.get("prior_events", []):
-        lines.append(f"\n   ⚠️ Раніше в моніторингу: {esc(prior.get('event_id', ''))}")
+    if dossier.get("prior_events"):
+        lines.append("")
+        lines.append("   ⚠️ <b>Раніше в моніторингу:</b>")
+        for prior in dossier["prior_events"]:
+            lines.append(f"      • {esc(prior.get('event_id', ''))}")
 
+    return "\n".join(lines)
+
+
+def format_document_diff_telegram(event: Event) -> str | None:
+    diff = event.data.get("document_diff")
+    if not diff or not diff.get("is_significant"):
+        return None
+    changes = diff.get("changes", [])
+    lines = [
+        f"📄 <b>Зміна документа</b>",
+        f"   {esc(event.title)}",
+        f"   Версія: {diff.get('prev_version', '?')} → {diff.get('new_version', '?')}",
+    ]
+    for ch in changes:
+        lines.append(f"   ⚠️ {esc(ch)}")
+    if event.url:
+        lines.append(f"   🔗 {event.url}")
+    return "\n".join(lines)
+
+
+def format_decision_analysis_telegram(event: Event) -> str | None:
+    analysis = event.data.get("decision_analysis")
+    if not analysis:
+        return None
+    subj_labels = {"land": "земля", "lease": "оренда", "privatization": "приватизація",
+                   "construction": "будівництво", "communal": "комунальне"}
+    parts = []
+    if analysis.get("subjects"):
+        parts.append("Теми: " + ", ".join(subj_labels.get(s, s) for s in analysis["subjects"]))
+    if analysis.get("amounts_uah"):
+        max_amt = max(analysis["amounts_uah"])
+        parts.append(f"Сума: {max_amt:,.0f} грн")
+    if analysis.get("areas"):
+        parts.append("Площа: " + ", ".join(analysis["areas"]))
+    if analysis.get("suggested_angle"):
+        parts.append(f"💡 {analysis['suggested_angle']}")
+
+    if not parts:
+        return None
+
+    lines = [f"🔍 <b>Аналіз рішення</b>", f"   {esc(event.title)}"]
+    for p in parts:
+        lines.append(f"   {esc(p)}")
+    if event.url:
+        lines.append(f"   🔗 {event.url}")
     return "\n".join(lines)

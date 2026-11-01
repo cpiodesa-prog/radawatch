@@ -203,8 +203,7 @@ class Pipeline:
         # Mark seen + update cadence + save
         for event in all_events:
             self.state.mark_seen(event.id)
-            # Index persons mentioned in personnel events
-            if event.category == "personnel" and event.data.get("person_name"):
+            if event.data.get("person_name"):
                 self.state.record_person(event.data["person_name"], event.id)
 
         self.state.trim_seen()
