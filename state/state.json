@@ -505,6 +505,8 @@
     "mykolaiv.commissions|з питань екології, природокористування, просторового розвитку, містобудування, архітектури і будівництва, регулювання земельних відносин|15.10.2026|13:0011:0012:00": "2026-11-01T14:36:50.755838",
     "mykolaiv.commissions|з питань економічної і інвестиційної політики, планування, бюджету, фінансів та соціально-економічного розвитку, підприємництва, наповнення бюджету та використання бюджетних коштів|27.10.2026|16:00": "2026-11-01T14:36:50.755834",
     "mykolaiv.commissions|з питань прав людини, дітей, сім'ї, законності, гласності, антикорупційної політики, місцевого самоврядування, депутатської діяльності та етики|19.10.2026|16:00": "2026-11-01T14:36:50.755822",
+    "odesa.omva|https://omr.gov.ua/ua/acts/omva/224234/": "2026-11-06T15:27:06.253794",
+    "odesa.omva|https://omr.gov.ua/ua/acts/omva/224237/": "2026-11-06T15:27:06.253791",
     "odesa.omva|https://omr.gov.ua/ua/acts/omva/224203/": "2026-11-05T15:52:46.584243",
     "odesa.omva|https://omr.gov.ua/ua/acts/omva/224147/": "2026-11-04T15:50:41.035613",
     "odesa.omva|https://omr.gov.ua/ua/acts/omva/224165/": "2026-11-04T15:50:41.035609",
@@ -563,6 +565,8 @@
     "odesa.omva|https://omr.gov.ua/ua/acts/omva/223981/": "2026-11-01T14:36:50.755854",
     "odesa.omva|https://omr.gov.ua/ua/acts/omva/223988/": "2026-11-01T14:36:50.755851",
     "odesa.omva|https://omr.gov.ua/ua/acts/omva/223995/": "2026-11-01T14:36:50.755847",
+    "odesa.personnel|https://omr.gov.ua/ua/acts/mayor/224217/": "2026-11-06T15:27:06.253799",
+    "odesa.personnel|https://omr.gov.ua/ua/acts/mayor/224213/": "2026-11-06T15:27:06.253797",
     "odesa.personnel|https://omr.gov.ua/ua/acts/mayor/224205/": "2026-11-05T15:52:46.584254",
     "odesa.personnel|https://omr.gov.ua/ua/acts/mayor/224053/": "2026-11-02T17:30:57.988804",
     "odesa.personnel|https://omr.gov.ua/ua/acts/mayor/222047/": "2026-11-01T14:36:50.756115",
@@ -614,7 +618,8 @@
     "odesa.personnel|https://omr.gov.ua/ua/acts/mayor/223880/": "2026-11-01T14:36:50.755990",
     "odesa.personnel|https://omr.gov.ua/ua/acts/mayor/224006/": "2026-11-01T14:36:50.755987",
     "odesa.vykonkom|https://omr.gov.ua/ua/announce/249143/": "2026-11-04T15:50:41.035615",
-    "odesa.vykonkom|https://omr.gov.ua/ua/announce/249081/": "2026-11-01T14:36:50.756118"
+    "odesa.vykonkom|https://omr.gov.ua/ua/announce/249081/": "2026-11-01T14:36:50.756118",
+    "mykolaiv.sessions|https://mkrada.gov.ua/documents/53336.html": "2026-11-06T15:27:06.253782"
   },
   "cadence": {
     "today_news": 0,
