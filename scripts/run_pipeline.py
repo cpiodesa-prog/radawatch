@@ -147,7 +147,7 @@ def _send_telegram_notifications(events: list, state=None):
     if sent:
         log.info("Sent %d Telegram notifications", sent)
     if filtered:
-        log.info("Filtered %d routine land permits (noise)", filtered)
+        log.info("Filtered %d noisy decisions (land + supporting docs)", filtered)
 
 
 def _send_intelligence_alerts(events: list):

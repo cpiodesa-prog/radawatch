@@ -1,7 +1,8 @@
 """Collector: Odesa council and executive committee decisions.
 
 Ported from omr-monitor/parsers/odesa.py.
-Scans decision pages for .docx/.pdf links (project texts for risk analysis).
+Scans decision pages for .docx/.pdf links AND decision page links
+(omr.gov.ua uses HTML sub-pages, not downloadable docs).
 """
 
 from __future__ import annotations
@@ -21,6 +22,8 @@ from .. import register_collector
 from . import pow_solver
 
 log = logging.getLogger("radawatch.odesa.decisions")
+
+DECISION_PAGE_RE = re.compile(r"/ua/acts/(?:projects|executive)/(?:committee|council)/\d+/")
 
 
 def _make_id(*parts: str) -> str:
@@ -67,30 +70,52 @@ class OdesaDecisionsCollector(BaseCollector):
 
         for link_tag in soup.find_all("a", href=True):
             href = link_tag["href"]
+
             file_type = _guess_file_type(href)
-            if file_type is None:
+            if file_type:
+                title = link_tag.get_text(strip=True) or href.rsplit("/", 1)[-1]
+                container_text = link_tag.parent.get_text(" ", strip=True) if link_tag.parent else title
+                file_url = urljoin(url, href)
+                decision_id = _make_id("odesa", title, file_url)
+
+                eid = self.make_event_id(decision_id)
+                if self.state.is_seen(eid):
+                    continue
+
+                events.append(Event(
+                    id=eid,
+                    source=self.source_id,
+                    city="odesa",
+                    category="decision",
+                    title=title,
+                    url=file_url,
+                    detected_at=datetime.now(),
+                    data={"body": body, "file_type": file_type, "container_text": container_text},
+                    files=[FileRef(path=file_url, mime_type=f"application/{file_type}")],
+                ))
                 continue
 
-            title = link_tag.get_text(strip=True) or href.rsplit("/", 1)[-1]
-            container_text = link_tag.parent.get_text(" ", strip=True) if link_tag.parent else title
-            file_url = urljoin(url, href)
-            decision_id = _make_id("odesa", title, file_url)
+            if DECISION_PAGE_RE.match(href):
+                title = link_tag.get_text(strip=True)
+                if not title:
+                    continue
+                page_url = urljoin(url, href)
+                decision_id = _make_id("odesa", href)
 
-            eid = self.make_event_id(decision_id)
-            if self.state.is_seen(eid):
-                continue
+                eid = self.make_event_id(decision_id)
+                if self.state.is_seen(eid):
+                    continue
 
-            events.append(Event(
-                id=eid,
-                source=self.source_id,
-                city="odesa",
-                category="decision",
-                title=title,
-                url=file_url,
-                detected_at=datetime.now(),
-                data={"body": body, "file_type": file_type, "container_text": container_text},
-                files=[FileRef(path=file_url, mime_type=f"application/{file_type}")],
-            ))
+                events.append(Event(
+                    id=eid,
+                    source=self.source_id,
+                    city="odesa",
+                    category="decision",
+                    title=title,
+                    url=page_url,
+                    detected_at=datetime.now(),
+                    data={"body": body, "container_text": title},
+                ))
 
         log.info("Odesa decisions (%s): %d new", body, len(events))
         return events

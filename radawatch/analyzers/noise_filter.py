@@ -1,8 +1,8 @@
 """Noise filter — suppresses routine decisions that clutter Telegram.
 
-Routine land permits for individual citizens are noise unless:
-  - the person appears in people.csv (known officials)
-  - the same person received multiple permits (tracked in state)
+Filtered categories:
+  1. All land-related decisions (земельн*) — unless a known official is mentioned
+  2. Supporting/aggregate documents (пояснювальна записка, додаток, зведена таблиця)
 """
 
 from __future__ import annotations
@@ -18,15 +18,15 @@ from ..state import StateManager
 log = logging.getLogger("radawatch.analyzers.noise_filter")
 
 LAND_KEYWORD_RE = re.compile(r"земельн", re.I)
-CITIZEN_ACTION_RE = re.compile(
-    r"(?:надання|передач[уі]|відведення).*?"
-    r"(?:громадянин[уіа]|громадянц[іи]|гр\.)",
-    re.I | re.S,
-)
 
 CITIZEN_RE = re.compile(
     r"(?:громадянин[уіа]|громадянц[іи]|гр\.)\s+"
     r"([А-ЯІЇЄҐ][а-яіїєґ']+\s+[А-ЯІЇЄҐ][а-яіїєґ']+(?:\s+[А-ЯІЇЄҐ][а-яіїєґ']+)?)",
+    re.I,
+)
+
+SUPPORTING_DOC_RE = re.compile(
+    r"(?:пояснювальн[аі]\s+записк|додаток\b|зведен[аі]\s+таблиц|порівняльн[аі]\s+таблиц)",
     re.I,
 )
 
@@ -65,27 +65,26 @@ class NoiseFilter:
         container = event.data.get("container_text", "")
         full_text = f"{text} {container}"
 
-        if not (LAND_KEYWORD_RE.search(full_text) and CITIZEN_ACTION_RE.search(full_text)):
-            return False
+        if SUPPORTING_DOC_RE.search(text):
+            log.debug("Supporting document filtered: %s", text[:80])
+            return True
 
-        citizen_match = CITIZEN_RE.search(full_text)
-        if not citizen_match:
-            return False
+        if LAND_KEYWORD_RE.search(full_text):
+            citizen_match = CITIZEN_RE.search(full_text)
+            if citizen_match:
+                person_name = citizen_match.group(1).strip()
+                if person_name.lower() in self.known_names:
+                    log.info("Land decision mentions known person %s — NOT noise", person_name)
+                    return False
+                if self._state:
+                    history = self._state.get_person_history(person_name)
+                    if len(history) >= 1:
+                        log.info("Land decision mentions repeat person %s (%d prior) — NOT noise",
+                                 person_name, len(history))
+                        return False
+            return True
 
-        person_name = citizen_match.group(1).strip()
-
-        if person_name.lower() in self.known_names:
-            log.info("Land permit for known person %s — NOT noise", person_name)
-            return False
-
-        if self._state:
-            history = self._state.get_person_history(person_name)
-            if len(history) >= 1:
-                log.info("Land permit for repeat person %s (%d prior) — NOT noise",
-                         person_name, len(history))
-                return False
-
-        return True
+        return False
 
     def extract_citizen_name(self, event: Event) -> str | None:
         text = f"{event.title} {event.data.get('container_text', '')}"
